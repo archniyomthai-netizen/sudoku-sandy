@@ -1,0 +1,905 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudoku 6×6 - มินิมอลเกม</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-clue: #f1f5f9;
+      --surface-related: #eff6ff;
+      --surface-selected: #dbeafe;
+      --surface-error: #fef2f2;
+      --surface-valid: #f0fdf4;
+      --border: #cbd5e1;
+      --border-strong: #1e293b;
+      --ink: #0f172a;
+      --ink-user: #2563eb;
+      --ink-muted: #64748b;
+      --ink-error: #dc2626;
+      --ink-valid: #16a34a;
+      --brand: #2563eb;
+      --brand-hover: #1d4ed8;
+      --brand-ink: #ffffff;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+      line-height: 1.5;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 480px;
+      background: var(--surface);
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .title {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 999px;
+      background-color: #dcfce7;
+      color: #15803d;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: var(--ink-muted);
+    }
+
+    /* Status Message */
+    .status-banner {
+      min-height: 38px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      color: var(--ink-muted);
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+    }
+
+    .status-banner.error {
+      background: var(--surface-error);
+      color: var(--ink-error);
+      border-color: #fecaca;
+    }
+
+    .status-banner.success {
+      background: var(--surface-valid);
+      color: var(--ink-valid);
+      border-color: #bbf7d0;
+    }
+
+    /* 6x6 Sudoku Board */
+    .board-wrapper {
+      width: 100%;
+      max-width: 390px;
+      margin: 0 auto;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 2.5px solid var(--border-strong);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      user-select: none;
+    }
+
+    .cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(1.25rem, 5vw, 1.65rem);
+      font-weight: 600;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink-user);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    /* Remove outer right & bottom cell borders (handled by .board border) */
+    .cell[data-col="5"] {
+      border-right: none;
+    }
+    .cell[data-row="5"] {
+      border-bottom: none;
+    }
+
+    /* 2x3 Sub-grid Bold Dividers:
+       2 rows per sub-grid -> thick bottom border after row 1 and row 3
+       3 cols per sub-grid -> thick right border after col 2 */
+    .cell[data-col="2"] {
+      border-right: 2.5px solid var(--border-strong);
+    }
+    .cell[data-row="1"],
+    .cell[data-row="3"] {
+      border-bottom: 2.5px solid var(--border-strong);
+    }
+
+    /* Clue (Pre-filled locked cell) vs User input cell */
+    .cell.clue {
+      background-color: var(--surface-clue);
+      color: var(--ink);
+      font-weight: 700;
+      cursor: default;
+    }
+
+    .cell.related:not(.selected) {
+      background-color: var(--surface-related);
+    }
+
+    .cell.clue.related:not(.selected) {
+      background-color: #e2e8f0;
+    }
+
+    .cell.selected {
+      background-color: var(--surface-selected);
+      box-shadow: inset 0 0 0 2px var(--brand);
+      z-index: 1;
+    }
+
+    .cell.same-value:not(.selected) {
+      background-color: #bfdbfe;
+    }
+
+    .cell.invalid {
+      background-color: var(--surface-error);
+      color: var(--ink-error);
+    }
+
+    .cell.clue.invalid {
+      color: #991b1b;
+    }
+
+    .cell.verified-ok:not(.clue) {
+      color: var(--ink-valid);
+    }
+
+    /* On-screen Number Pad (1-6 + Clear) */
+    .numpad {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      width: 100%;
+      max-width: 390px;
+      margin: 0 auto;
+    }
+
+    .num-btn {
+      font: inherit;
+      font-size: 1.125rem;
+      font-weight: 600;
+      height: 46px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .num-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .num-btn:active {
+      transform: translateY(1px);
+      background: #e2e8f0;
+    }
+
+    .num-btn:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
+    .num-btn.erase-btn {
+      font-size: 0.875rem;
+      color: var(--ink-muted);
+    }
+
+    /* Control Buttons */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 390px;
+      margin: 0 auto;
+    }
+
+    .btn {
+      font: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 11px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: var(--brand);
+      color: var(--brand-ink);
+    }
+
+    .btn-primary:hover {
+      background: var(--brand-hover);
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .btn-full {
+      grid-column: 1 / -1;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.8125rem;
+      color: var(--ink-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-clue {
+      background: var(--surface-clue);
+    }
+
+    .swatch-user {
+      background: var(--surface);
+      border-color: var(--brand);
+    }
+
+    /* Victory Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.15);
+      transform: translateY(10px) scale(0.97);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-backdrop.open .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px;
+      font-size: 1.75rem;
+    }
+
+    .modal-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+
+    .modal-desc {
+      font-size: 0.9375rem;
+      color: var(--ink-muted);
+      margin-bottom: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+    }
+
+    @media (max-width: 420px) {
+      .app-container {
+        padding: 18px 14px;
+      }
+      .controls {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-container">
+    <header class="header">
+      <div class="header-top">
+        <h1 class="title">Sudoku 6×6</h1>
+        <span class="badge">ระดับง่าย (Easy)</span>
+      </div>
+      <p class="subtitle">เติมตัวเลข 1–6 ให้ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 โดยไม่ซ้ำกัน</p>
+    </header>
+
+    <div id="statusBanner" class="status-banner" role="status" aria-live="polite">
+      คลิกเลือกช่องว่าง แล้วพิมพ์ตัวเลข 1–6 หรือกดปุ่มด้านล่าง
+    </div>
+
+    <div class="board-wrapper">
+      <div id="board" class="board" role="grid" aria-label="ตาราง Sudoku ขนาด 6x6"></div>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <div class="legend-item">
+        <span class="swatch swatch-clue"></span>
+        <span>ตัวเลขโจทย์ (ล็อก)</span>
+      </div>
+      <div class="legend-item">
+        <span class="swatch swatch-user"></span>
+        <span>ช่องสำหรับเติม (1–6)</span>
+      </div>
+    </div>
+
+    <div class="numpad" aria-label="แป้นพิมพ์ตัวเลข 1 ถึง 6">
+      <button type="button" class="num-btn" data-num="1">1</button>
+      <button type="button" class="num-btn" data-num="2">2</button>
+      <button type="button" class="num-btn" data-num="3">3</button>
+      <button type="button" class="num-btn" data-num="4">4</button>
+      <button type="button" class="num-btn" data-num="5">5</button>
+      <button type="button" class="num-btn" data-num="6">6</button>
+      <button type="button" class="num-btn erase-btn" data-num="0" title="ลบตัวเลข">ลบ</button>
+    </div>
+
+    <div class="controls">
+      <button type="button" id="checkBtn" class="btn btn-primary">
+        ตรวจสอบคำตอบ (Check)
+      </button>
+      <button type="button" id="resetBtn" class="btn btn-secondary">
+        ล้างที่กรอก (Reset)
+      </button>
+      <button type="button" id="newGameBtn" class="btn btn-secondary btn-full">
+        เริ่มเกมใหม่ (New Game)
+      </button>
+    </div>
+  </main>
+
+  <!-- Victory Modal -->
+  <div id="winModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="modal">
+      <div class="modal-icon" aria-hidden="true">🎉</div>
+      <h2 id="winTitle" class="modal-title">ยินดีด้วย! คุณแก้ปริศนาสำเร็จ</h2>
+      <p class="modal-desc">คุณเติมตัวเลข 1–6 ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 ได้อย่างถูกต้องครบถ้วน</p>
+      <div class="modal-actions">
+        <button type="button" id="closeModalBtn" class="btn btn-secondary">ดูตาราง</button>
+        <button type="button" id="playAgainBtn" class="btn btn-primary">เล่นเกมใหม่</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const SIZE = 6;
+      const BOX_ROWS = 2;
+      const BOX_COLS = 3;
+      const CLUES_COUNT = 20; // Easy level: 20 pre-filled clues out of 36 cells
+
+      let solutionGrid = [];
+      let initialGrid = [];
+      let currentGrid = [];
+      let selectedCell = null; // { row, col }
+      let checkFeedbackCells = new Map(); // key "r,c" -> 'invalid' | 'ok'
+
+      const boardEl = document.getElementById('board');
+      const statusBanner = document.getElementById('statusBanner');
+      const checkBtn = document.getElementById('checkBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const newGameBtn = document.getElementById('newGameBtn');
+      const winModal = document.getElementById('winModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+      const playAgainBtn = document.getElementById('playAgainBtn');
+
+      // Utility: Shuffle array in-place
+      function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      // Check if placing `num` at (row, col) is valid in `grid`
+      function isSafe(grid, row, col, num) {
+        for (let i = 0; i < SIZE; i++) {
+          if (i !== col && grid[row][i] === num) return false;
+          if (i !== row && grid[i][col] === num) return false;
+        }
+        const startRow = Math.floor(row / BOX_ROWS) * BOX_ROWS;
+        const startCol = Math.floor(col / BOX_COLS) * BOX_COLS;
+        for (let r = 0; r < BOX_ROWS; r++) {
+          for (let c = 0; c < BOX_COLS; c++) {
+            const rr = startRow + r;
+            const cc = startCol + c;
+            if ((rr !== row || cc !== col) && grid[rr][cc] === num) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      // Generate a full valid 6x6 board using backtracking
+      function generateSolvedBoard() {
+        const grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+
+        function fill(pos) {
+          if (pos === SIZE * SIZE) return true;
+          const r = Math.floor(pos / SIZE);
+          const c = pos % SIZE;
+          const nums = shuffle([1, 2, 3, 4, 5, 6]);
+          for (const num of nums) {
+            if (isSafe(grid, r, c, num)) {
+              grid[r][c] = num;
+              if (fill(pos + 1)) return true;
+              grid[r][c] = 0;
+            }
+          }
+          return false;
+        }
+
+        fill(0);
+        return grid;
+      }
+
+      // Count number of solutions (up to 2) to guarantee unique solution
+      function countSolutions(grid, limit = 2) {
+        let count = 0;
+
+        function solve(pos) {
+          if (count >= limit) return;
+          if (pos === SIZE * SIZE) {
+            count++;
+            return;
+          }
+          const r = Math.floor(pos / SIZE);
+          const c = pos % SIZE;
+          if (grid[r][c] !== 0) {
+            solve(pos + 1);
+            return;
+          }
+          for (let num = 1; num <= SIZE; num++) {
+            if (isSafe(grid, r, c, num)) {
+              grid[r][c] = num;
+              solve(pos + 1);
+              grid[r][c] = 0;
+              if (count >= limit) return;
+            }
+          }
+        }
+
+        solve(0);
+        return count;
+      }
+
+      // Create an Easy puzzle with balanced clues in every 2x3 box
+      function createEasyPuzzle() {
+        const solved = generateSolvedBoard();
+        const puzzle = solved.map(row => [...row]);
+
+        // List all coordinates and shuffle to remove numbers while keeping unique solution
+        const positions = [];
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            positions.push([r, c]);
+          }
+        }
+        shuffle(positions);
+
+        let remaining = SIZE * SIZE;
+        for (const [r, c] of positions) {
+          if (remaining <= CLUES_COUNT) break;
+
+          // Ensure every row, column, and 2x3 sub-grid keeps at least 2 clues for beginner friendliness
+          const rowClues = puzzle[r].filter(v => v !== 0).length;
+          const colClues = puzzle.map(row => row[c]).filter(v => v !== 0).length;
+          if (rowClues <= 2 || colClues <= 2) continue;
+
+          const backup = puzzle[r][c];
+          puzzle[r][c] = 0;
+
+          const copy = puzzle.map(row => [...row]);
+          if (countSolutions(copy, 2) !== 1) {
+            puzzle[r][c] = backup;
+          } else {
+            remaining--;
+          }
+        }
+
+        return { solved, puzzle };
+      }
+
+      function setStatus(message, type = 'normal') {
+        statusBanner.textContent = message;
+        statusBanner.className = 'status-banner';
+        if (type === 'error') statusBanner.classList.add('error');
+        if (type === 'success') statusBanner.classList.add('success');
+      }
+
+      function renderBoard() {
+        boardEl.innerHTML = '';
+        const selectedVal =
+          selectedCell && currentGrid[selectedCell.row][selectedCell.col] !== 0
+            ? currentGrid[selectedCell.row][selectedCell.col]
+            : null;
+
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const val = currentGrid[r][c];
+            const isClue = initialGrid[r][c] !== 0;
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.setAttribute('role', 'gridcell');
+            cell.setAttribute('tabindex', isClue ? '-1' : '0');
+            cell.setAttribute(
+              'aria-label',
+              `แถวที่ ${r + 1} คอลัมน์ที่ ${c + 1} ${
+                isClue ? `ตัวเลขโจทย์ ${val}` : val ? `กรอกเลข ${val}` : 'ช่องว่าง'
+              }`
+            );
+
+            if (isClue) {
+              cell.classList.add('clue');
+            }
+
+            if (selectedCell) {
+              const isSelected = selectedCell.row === r && selectedCell.col === c;
+              const sameRow = selectedCell.row === r;
+              const sameCol = selectedCell.col === c;
+              const sameBox =
+                Math.floor(selectedCell.row / BOX_ROWS) === Math.floor(r / BOX_ROWS) &&
+                Math.floor(selectedCell.col / BOX_COLS) === Math.floor(c / BOX_COLS);
+
+              if (isSelected) {
+                cell.classList.add('selected');
+              } else if (sameRow || sameCol || sameBox) {
+                cell.classList.add('related');
+              }
+
+              if (selectedVal && val === selectedVal && !isSelected) {
+                cell.classList.add('same-value');
+              }
+            }
+
+            const feedback = checkFeedbackCells.get(`${r},${c}`);
+            if (feedback === 'invalid') {
+              cell.classList.add('invalid');
+            } else if (feedback === 'ok') {
+              cell.classList.add('verified-ok');
+            }
+
+            cell.textContent = val !== 0 ? val : '';
+
+            cell.addEventListener('click', () => {
+              selectCell(r, c);
+            });
+
+            boardEl.appendChild(cell);
+          }
+        }
+      }
+
+      function selectCell(row, col) {
+        selectedCell = { row, col };
+        renderBoard();
+      }
+
+      function inputNumber(num) {
+        if (!selectedCell) {
+          setStatus('กรุณาคลิกเลือกช่องว่างที่ต้องการเติมก่อนครับ', 'error');
+          return;
+        }
+        const { row, col } = selectedCell;
+        if (initialGrid[row][col] !== 0) {
+          setStatus('ช่องนี้เป็นตัวเลขโจทย์เริ่มต้น ไม่สามารถแก้ไขได้ครับ', 'error');
+          return;
+        }
+
+        checkFeedbackCells.clear();
+        currentGrid[row][col] = num;
+        renderBoard();
+
+        if (num === 0) {
+          setStatus('ลบตัวเลขในช่องที่เลือกแล้ว');
+          return;
+        }
+
+        // Check if board is completely filled and valid
+        if (isBoardCompleteAndValid()) {
+          setStatus('ยอดเยี่ยม! คุณแก้ปริศนา Sudoku 6×6 สำเร็จแล้ว', 'success');
+          openWinModal();
+        } else {
+          setStatus(`ใส่เลข ${num} ที่แถว ${row + 1} คอลัมน์ ${col + 1}`);
+        }
+      }
+
+      function isBoardCompleteAndValid() {
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const val = currentGrid[r][c];
+            if (val === 0 || !isSafe(currentGrid, r, c, val)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      function checkBoard() {
+        checkFeedbackCells.clear();
+        let emptyCount = 0;
+        let errorCount = 0;
+
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            const val = currentGrid[r][c];
+            if (val === 0) {
+              emptyCount++;
+              continue;
+            }
+
+            // Check rule conflict OR mismatch with the puzzle solution
+            const ruleValid = isSafe(currentGrid, r, c, val);
+            const matchesSolution = val === solutionGrid[r][c];
+
+            if (!ruleValid || !matchesSolution) {
+              checkFeedbackCells.set(`${r},${c}`, 'invalid');
+              if (initialGrid[r][c] === 0) {
+                errorCount++;
+              }
+            } else if (initialGrid[r][c] === 0) {
+              checkFeedbackCells.set(`${r},${c}`, 'ok');
+            }
+          }
+        }
+
+        renderBoard();
+
+        if (errorCount > 0) {
+          setStatus(`พบตัวเลขที่ยังไม่ถูกต้อง ${errorCount} ช่อง (ไฮไลต์สีแดง)`, 'error');
+        } else if (emptyCount > 0) {
+          setStatus(`ตัวเลขที่กรอกถูกต้องทั้งหมด! เหลืออีก ${emptyCount} ช่องว่าง`, 'success');
+        } else {
+          setStatus('ยินดีด้วย! คำตอบถูกต้องครบทุกช่อง', 'success');
+          openWinModal();
+        }
+      }
+
+      function resetCurrentPuzzle() {
+        currentGrid = initialGrid.map(row => [...row]);
+        checkFeedbackCells.clear();
+        renderBoard();
+        setStatus('รีเซ็ตช่องที่กรอกกลับเป็นโจทย์เริ่มต้นแล้ว');
+      }
+
+      function startNewGame() {
+        const { solved, puzzle } = createEasyPuzzle();
+        solutionGrid = solved;
+        initialGrid = puzzle.map(row => [...row]);
+        currentGrid = puzzle.map(row => [...row]);
+        checkFeedbackCells.clear();
+
+        // Select first empty cell automatically for convenience
+        selectedCell = null;
+        for (let r = 0; r < SIZE && !selectedCell; r++) {
+          for (let c = 0; c < SIZE && !selectedCell; c++) {
+            if (initialGrid[r][c] === 0) {
+              selectedCell = { row: r, col: c };
+            }
+          }
+        }
+
+        closeWinModal();
+        renderBoard();
+        setStatus('เริ่มเกมใหม่เรียบร้อย! เลือกช่องว่างแล้วเติมตัวเลข 1–6 ได้เลย');
+      }
+
+      function openWinModal() {
+        winModal.classList.add('open');
+      }
+
+      function closeWinModal() {
+        winModal.classList.remove('open');
+      }
+
+      // Keyboard navigation & number entry (1-6, Backspace/Delete, Arrow keys)
+      document.addEventListener('keydown', (e) => {
+        if (winModal.classList.contains('open')) {
+          if (e.key === 'Escape') closeWinModal();
+          return;
+        }
+
+        if (e.key >= '1' && e.key <= '6') {
+          e.preventDefault();
+          inputNumber(Number(e.key));
+          return;
+        }
+
+        if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+          e.preventDefault();
+          inputNumber(0);
+          return;
+        }
+
+        if (!selectedCell) return;
+
+        let { row, col } = selectedCell;
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          row = (row + SIZE - 1) % SIZE;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          row = (row + 1) % SIZE;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          col = (col + SIZE - 1) % SIZE;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          col = (col + 1) % SIZE;
+          selectCell(row, col);
+        }
+      });
+
+      // On-screen numpad listeners
+      document.querySelectorAll('.num-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const num = Number(btn.dataset.num);
+          inputNumber(num);
+        });
+      });
+
+      checkBtn.addEventListener('click', checkBoard);
+      resetBtn.addEventListener('click', resetCurrentPuzzle);
+      newGameBtn.addEventListener('click', startNewGame);
+      closeModalBtn.addEventListener('click', closeWinModal);
+      playAgainBtn.addEventListener('click', startNewGame);
+      winModal.addEventListener('click', (e) => {
+        if (e.target === winModal) closeWinModal();
+      });
+
+      // Initialize first game
+      startNewGame();
+    })();
+  </script>
+</body>
+</html>
