@@ -1,0 +1,1164 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudoku 6×6 & 9×9 - มินิมอลเกม</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-clue: #f1f5f9;
+      --surface-related: #eff6ff;
+      --surface-selected: #dbeafe;
+      --surface-error: #fef2f2;
+      --surface-valid: #f0fdf4;
+      --border: #cbd5e1;
+      --border-strong: #1e293b;
+      --ink: #0f172a;
+      --ink-user: #2563eb;
+      --ink-muted: #64748b;
+      --ink-error: #dc2626;
+      --ink-valid: #16a34a;
+      --brand: #2563eb;
+      --brand-hover: #1d4ed8;
+      --brand-ink: #ffffff;
+      --radius-lg: 16px;
+      --radius-md: 10px;
+      --shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+      line-height: 1.5;
+    }
+
+    .app-container {
+      width: 100%;
+      max-width: 520px;
+      background: var(--surface);
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .header-bar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 999px;
+      background-color: #dcfce7;
+      color: #15803d;
+    }
+
+    /* Top-right Mode Switcher (6x6 / 9x9) */
+    .mode-switcher {
+      display: inline-flex;
+      background: #f1f5f9;
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      margin-left: auto;
+    }
+
+    .mode-btn {
+      font: inherit;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .mode-btn:hover {
+      color: var(--ink);
+    }
+
+    .mode-btn.active {
+      background: var(--surface);
+      color: var(--brand);
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+    }
+
+    .mode-btn:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 1px;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: var(--ink-muted);
+    }
+
+    /* Status Message */
+    .status-banner {
+      min-height: 38px;
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-weight: 500;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc;
+      color: var(--ink-muted);
+      border: 1px solid #e2e8f0;
+      transition: all 0.2s ease;
+    }
+
+    .status-banner.error {
+      background: var(--surface-error);
+      color: var(--ink-error);
+      border-color: #fecaca;
+    }
+
+    .status-banner.success {
+      background: var(--surface-valid);
+      color: var(--ink-valid);
+      border-color: #bbf7d0;
+    }
+
+    /* Sudoku Board */
+    .board-wrapper {
+      width: 100%;
+      max-width: 432px;
+      margin: 0 auto;
+    }
+
+    .board {
+      display: grid;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border: 2.5px solid var(--border-strong);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--surface);
+      user-select: none;
+    }
+
+    .board.size-6 {
+      grid-template-columns: repeat(6, 1fr);
+    }
+
+    .board.size-9 {
+      grid-template-columns: repeat(9, 1fr);
+    }
+
+    .cell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink-user);
+      cursor: pointer;
+      outline: none;
+      transition: background-color 0.12s ease, color 0.12s ease;
+    }
+
+    .board.size-6 .cell {
+      font-size: clamp(1.2rem, 5vw, 1.65rem);
+    }
+
+    .board.size-9 .cell {
+      font-size: clamp(0.95rem, 3.8vw, 1.3rem);
+    }
+
+    .cell.box-right {
+      border-right: 2.5px solid var(--border-strong);
+    }
+
+    .cell.box-bottom {
+      border-bottom: 2.5px solid var(--border-strong);
+    }
+
+    .cell.last-col {
+      border-right: none;
+    }
+
+    .cell.last-row {
+      border-bottom: none;
+    }
+
+    /* Clue (Pre-filled locked cell) vs User input cell */
+    .cell.clue {
+      background-color: var(--surface-clue);
+      color: var(--ink);
+      font-weight: 700;
+      cursor: default;
+    }
+
+    .cell.related:not(.selected) {
+      background-color: var(--surface-related);
+    }
+
+    .cell.clue.related:not(.selected) {
+      background-color: #e2e8f0;
+    }
+
+    .cell.selected {
+      background-color: var(--surface-selected);
+      box-shadow: inset 0 0 0 2px var(--brand);
+      z-index: 1;
+    }
+
+    .cell.same-value:not(.selected) {
+      background-color: #bfdbfe;
+    }
+
+    .cell.invalid {
+      background-color: var(--surface-error);
+      color: var(--ink-error);
+    }
+
+    .cell.clue.invalid {
+      color: #991b1b;
+    }
+
+    .cell.verified-ok:not(.clue) {
+      color: var(--ink-valid);
+    }
+
+    /* On-screen Number Pad */
+    .numpad {
+      display: grid;
+      gap: 6px;
+      width: 100%;
+      max-width: 432px;
+      margin: 0 auto;
+    }
+
+    .numpad.size-6 {
+      grid-template-columns: repeat(7, 1fr);
+    }
+
+    .numpad.size-9 {
+      grid-template-columns: repeat(5, 1fr);
+    }
+
+    .num-btn {
+      font: inherit;
+      font-size: 1.1rem;
+      font-weight: 600;
+      height: 44px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--ink);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+    }
+
+    .num-btn:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .num-btn:active {
+      transform: translateY(1px);
+      background: #e2e8f0;
+    }
+
+    .num-btn:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
+    .num-btn.erase-btn {
+      font-size: 0.875rem;
+      color: var(--ink-muted);
+    }
+
+    /* Control Buttons */
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      max-width: 432px;
+      margin: 0 auto;
+    }
+
+    .btn {
+      font: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      padding: 11px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--brand);
+      outline-offset: 2px;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: var(--brand);
+      color: var(--brand-ink);
+    }
+
+    .btn-primary:hover {
+      background: var(--brand-hover);
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--ink);
+      border-color: var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
+    .btn-full {
+      grid-column: 1 / -1;
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      font-size: 0.8125rem;
+      color: var(--ink-muted);
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .swatch-clue {
+      background: var(--surface-clue);
+    }
+
+    .swatch-user {
+      background: var(--surface);
+      border-color: var(--brand);
+    }
+
+    /* Victory Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.5);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.15);
+      transform: translateY(10px) scale(0.97);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-backdrop.open .modal {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 14px;
+      font-size: 1.75rem;
+    }
+
+    .modal-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+
+    .modal-desc {
+      font-size: 0.9375rem;
+      color: var(--ink-muted);
+      margin-bottom: 20px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .modal-actions .btn {
+      flex: 1;
+    }
+
+    @media (max-width: 440px) {
+      .app-container {
+        padding: 18px 14px;
+      }
+      .controls {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-container">
+    <header class="header">
+      <div class="header-bar">
+        <div class="title-group">
+          <h1 id="gameTitle" class="title">Sudoku 6×6</h1>
+          <span class="badge">ระดับง่าย (Easy)</span>
+        </div>
+        <div class="mode-switcher" role="group" aria-label="เลือกขนาดตาราง">
+          <button type="button" class="mode-btn active" data-size="6" aria-pressed="true">6×6</button>
+          <button type="button" class="mode-btn" data-size="9" aria-pressed="false">9×9</button>
+        </div>
+      </div>
+      <p id="gameSubtitle" class="subtitle">เติมตัวเลข 1–6 ให้ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 โดยไม่ซ้ำกัน</p>
+    </header>
+
+    <div id="statusBanner" class="status-banner" role="status" aria-live="polite">
+      คลิกเลือกช่องว่าง แล้วพิมพ์ตัวเลข 1–6 หรือกดปุ่มด้านล่าง
+    </div>
+
+    <div class="board-wrapper">
+      <div id="board" class="board size-6" role="grid" aria-label="ตาราง Sudoku"></div>
+    </div>
+
+    <div class="legend" aria-hidden="true">
+      <div class="legend-item">
+        <span class="swatch swatch-clue"></span>
+        <span>ตัวเลขโจทย์ (ล็อก)</span>
+      </div>
+      <div class="legend-item">
+        <span class="swatch swatch-user"></span>
+        <span id="legendUserText">ช่องสำหรับเติม (1–6)</span>
+      </div>
+    </div>
+
+    <div id="numpad" class="numpad size-6" aria-label="แป้นพิมพ์ตัวเลข"></div>
+
+    <div class="controls">
+      <button type="button" id="checkBtn" class="btn btn-primary">
+        ตรวจสอบคำตอบ (Check)
+      </button>
+      <button type="button" id="resetBtn" class="btn btn-secondary">
+        ล้างที่กรอก (Reset)
+      </button>
+      <button type="button" id="newGameBtn" class="btn btn-secondary btn-full">
+        เริ่มเกมใหม่ (New Game)
+      </button>
+    </div>
+  </main>
+
+  <!-- Victory Modal -->
+  <div id="winModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="modal">
+      <div class="modal-icon" aria-hidden="true">🎉</div>
+      <h2 id="winTitle" class="modal-title">ยินดีด้วย! คุณแก้ปริศนาสำเร็จ</h2>
+      <p id="winDesc" class="modal-desc">คุณเติมตัวเลข 1–6 ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 ได้อย่างถูกต้องครบถ้วน</p>
+      <div class="modal-actions">
+        <button type="button" id="closeModalBtn" class="btn btn-secondary">ดูตาราง</button>
+        <button type="button" id="playAgainBtn" class="btn btn-primary">เล่นเกมใหม่</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'sudoku_saved_state_v1';
+
+      const MODES = {
+        6: {
+          size: 6,
+          boxRows: 2,
+          boxCols: 3,
+          cluesCount: 20, // Easy: 20/36 pre-filled
+          minRowColClues: 2,
+          title: 'Sudoku 6×6',
+          subtitle: 'เติมตัวเลข 1–6 ให้ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 โดยไม่ซ้ำกัน',
+          legendText: 'ช่องสำหรับเติม (1–6)',
+          winDesc: 'คุณเติมตัวเลข 1–6 ครบทุกแถว คอลัมน์ และกล่องย่อย 2×3 ได้อย่างถูกต้องครบถ้วน'
+        },
+        9: {
+          size: 9,
+          boxRows: 3,
+          boxCols: 3,
+          cluesCount: 45, // Easy: 45/81 pre-filled
+          minRowColClues: 3,
+          title: 'Sudoku 9×9',
+          subtitle: 'เติมตัวเลข 1–9 ให้ครบทุกแถว คอลัมน์ และกล่องย่อย 3×3 โดยไม่ซ้ำกัน',
+          legendText: 'ช่องสำหรับเติม (1–9)',
+          winDesc: 'คุณเติมตัวเลข 1–9 ครบทุกแถว คอลัมน์ และกล่องย่อย 3×3 ได้อย่างถูกต้องครบถ้วน'
+        }
+      };
+
+      let currentSize = 6;
+      let solutionGrid = [];
+      let initialGrid = [];
+      let currentGrid = [];
+      let selectedCell = null; // { row, col }
+      let checkFeedbackCells = new Map(); // key "r,c" -> 'invalid' | 'ok'
+
+      // Per-mode in-memory + localStorage state so switching between 6x6 and 9x9 or refreshing keeps progress
+      let savedBoardsBySize = { 6: null, 9: null };
+
+      const boardEl = document.getElementById('board');
+      const numpadEl = document.getElementById('numpad');
+      const gameTitleEl = document.getElementById('gameTitle');
+      const gameSubtitleEl = document.getElementById('gameSubtitle');
+      const legendUserTextEl = document.getElementById('legendUserText');
+      const winDescEl = document.getElementById('winDesc');
+      const statusBanner = document.getElementById('statusBanner');
+      const checkBtn = document.getElementById('checkBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const newGameBtn = document.getElementById('newGameBtn');
+      const winModal = document.getElementById('winModal');
+      const closeModalBtn = document.getElementById('closeModalBtn');
+      const playAgainBtn = document.getElementById('playAgainBtn');
+      const modeBtns = document.querySelectorAll('.mode-btn');
+
+      // Utility: Shuffle array in-place
+      function shuffle(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      // Persist game state safely (works in standalone browsers & degrades gracefully in sandboxed frames)
+      function saveGameState() {
+        savedBoardsBySize[currentSize] = {
+          solutionGrid: solutionGrid.map(r => [...r]),
+          initialGrid: initialGrid.map(r => [...r]),
+          currentGrid: currentGrid.map(r => [...r]),
+          selectedCell: selectedCell ? { ...selectedCell } : null
+        };
+
+        try {
+          const payload = {
+            activeSize: currentSize,
+            boards: savedBoardsBySize
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch (err) {
+          // Ignore storage errors in restricted environments
+        }
+      }
+
+      function isValidSavedBoard(data, size) {
+        if (!data || typeof data !== 'object') return false;
+        const { solutionGrid: s, initialGrid: i, currentGrid: c } = data;
+        if (!Array.isArray(s) || !Array.isArray(i) || !Array.isArray(c)) return false;
+        if (s.length !== size || i.length !== size || c.length !== size) return false;
+        return s.every(r => Array.isArray(r) && r.length === size) &&
+               i.every(r => Array.isArray(r) && r.length === size) &&
+               c.every(r => Array.isArray(r) && r.length === size);
+      }
+
+      function loadGameStateFromStorage() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return false;
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== 'object') return false;
+
+          if (parsed.boards) {
+            if (isValidSavedBoard(parsed.boards[6], 6)) {
+              savedBoardsBySize[6] = parsed.boards[6];
+            }
+            if (isValidSavedBoard(parsed.boards[9], 9)) {
+              savedBoardsBySize[9] = parsed.boards[9];
+            }
+          }
+
+          const targetSize = parsed.activeSize === 9 ? 9 : 6;
+          if (savedBoardsBySize[targetSize]) {
+            currentSize = targetSize;
+            const b = savedBoardsBySize[targetSize];
+            solutionGrid = b.solutionGrid.map(r => [...r]);
+            initialGrid = b.initialGrid.map(r => [...r]);
+            currentGrid = b.currentGrid.map(r => [...r]);
+            selectedCell = b.selectedCell || findFirstEmptyCell(initialGrid, currentSize);
+            return true;
+          }
+        } catch (err) {
+          // Ignore storage read errors
+        }
+        return false;
+      }
+
+      function findFirstEmptyCell(grid, size) {
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            if (grid[r][c] === 0) {
+              return { row: r, col: c };
+            }
+          }
+        }
+        return { row: 0, col: 0 };
+      }
+
+      // Check if placing `num` at (row, col) is valid in `grid` for a given mode config
+      function isSafe(grid, row, col, num, config) {
+        const { size, boxRows, boxCols } = config;
+        for (let i = 0; i < size; i++) {
+          if (i !== col && grid[row][i] === num) return false;
+          if (i !== row && grid[i][col] === num) return false;
+        }
+        const startRow = Math.floor(row / boxRows) * boxRows;
+        const startCol = Math.floor(col / boxCols) * boxCols;
+        for (let r = 0; r < boxRows; r++) {
+          for (let c = 0; c < boxCols; c++) {
+            const rr = startRow + r;
+            const cc = startCol + c;
+            if ((rr !== row || cc !== col) && grid[rr][cc] === num) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      // Generate a full valid board using backtracking
+      function generateSolvedBoard(config) {
+        const { size } = config;
+        const grid = Array.from({ length: size }, () => Array(size).fill(0));
+        const baseNums = Array.from({ length: size }, (_, i) => i + 1);
+
+        function fill(pos) {
+          if (pos === size * size) return true;
+          const r = Math.floor(pos / size);
+          const c = pos % size;
+          const nums = shuffle([...baseNums]);
+          for (const num of nums) {
+            if (isSafe(grid, r, c, num, config)) {
+              grid[r][c] = num;
+              if (fill(pos + 1)) return true;
+              grid[r][c] = 0;
+            }
+          }
+          return false;
+        }
+
+        fill(0);
+        return grid;
+      }
+
+      // Count number of solutions (up to 2) to guarantee unique solution
+      function countSolutions(grid, config, limit = 2) {
+        const { size } = config;
+        let count = 0;
+
+        function solve(pos) {
+          if (count >= limit) return;
+          if (pos === size * size) {
+            count++;
+            return;
+          }
+          const r = Math.floor(pos / size);
+          const c = pos % size;
+          if (grid[r][c] !== 0) {
+            solve(pos + 1);
+            return;
+          }
+          for (let num = 1; num <= size; num++) {
+            if (isSafe(grid, r, c, num, config)) {
+              grid[r][c] = num;
+              solve(pos + 1);
+              grid[r][c] = 0;
+              if (count >= limit) return;
+            }
+          }
+        }
+
+        solve(0);
+        return count;
+      }
+
+      // Create an Easy puzzle with balanced clues
+      function createEasyPuzzle(config) {
+        const { size, cluesCount, minRowColClues } = config;
+        const solved = generateSolvedBoard(config);
+        const puzzle = solved.map(row => [...row]);
+
+        const positions = [];
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            positions.push([r, c]);
+          }
+        }
+        shuffle(positions);
+
+        let remaining = size * size;
+        for (const [r, c] of positions) {
+          if (remaining <= cluesCount) break;
+
+          const rowClues = puzzle[r].filter(v => v !== 0).length;
+          const colClues = puzzle.map(row => row[c]).filter(v => v !== 0).length;
+          if (rowClues <= minRowColClues || colClues <= minRowColClues) continue;
+
+          const backup = puzzle[r][c];
+          puzzle[r][c] = 0;
+
+          const copy = puzzle.map(row => [...row]);
+          if (countSolutions(copy, config, 2) !== 1) {
+            puzzle[r][c] = backup;
+          } else {
+            remaining--;
+          }
+        }
+
+        return { solved, puzzle };
+      }
+
+      function setStatus(message, type = 'normal') {
+        statusBanner.textContent = message;
+        statusBanner.className = 'status-banner';
+        if (type === 'error') statusBanner.classList.add('error');
+        if (type === 'success') statusBanner.classList.add('success');
+      }
+
+      function updateModeUI() {
+        const config = MODES[currentSize];
+        gameTitleEl.textContent = config.title;
+        gameSubtitleEl.textContent = config.subtitle;
+        legendUserTextEl.textContent = config.legendText;
+        winDescEl.textContent = config.winDesc;
+
+        boardEl.className = `board size-${currentSize}`;
+        boardEl.setAttribute('aria-label', `ตาราง Sudoku ขนาด ${currentSize}x${currentSize}`);
+
+        modeBtns.forEach(btn => {
+          const isCurrent = Number(btn.dataset.size) === currentSize;
+          btn.classList.toggle('active', isCurrent);
+          btn.setAttribute('aria-pressed', isCurrent ? 'true' : 'false');
+        });
+
+        renderNumpad();
+      }
+
+      function renderNumpad() {
+        numpadEl.className = `numpad size-${currentSize}`;
+        numpadEl.innerHTML = '';
+
+        for (let n = 1; n <= currentSize; n++) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'num-btn';
+          btn.dataset.num = String(n);
+          btn.textContent = String(n);
+          btn.addEventListener('click', () => inputNumber(n));
+          numpadEl.appendChild(btn);
+        }
+
+        const eraseBtn = document.createElement('button');
+        eraseBtn.type = 'button';
+        eraseBtn.className = 'num-btn erase-btn';
+        eraseBtn.dataset.num = '0';
+        eraseBtn.title = 'ลบตัวเลข';
+        eraseBtn.textContent = 'ลบ';
+        eraseBtn.addEventListener('click', () => inputNumber(0));
+        numpadEl.appendChild(eraseBtn);
+      }
+
+      function renderBoard() {
+        const config = MODES[currentSize];
+        const { size, boxRows, boxCols } = config;
+        boardEl.innerHTML = '';
+
+        const selectedVal =
+          selectedCell && currentGrid[selectedCell.row] && currentGrid[selectedCell.row][selectedCell.col] !== 0
+            ? currentGrid[selectedCell.row][selectedCell.col]
+            : null;
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const val = currentGrid[r][c];
+            const isClue = initialGrid[r][c] !== 0;
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.setAttribute('role', 'gridcell');
+            cell.setAttribute('tabindex', isClue ? '-1' : '0');
+            cell.setAttribute(
+              'aria-label',
+              `แถวที่ ${r + 1} คอลัมน์ที่ ${c + 1} ${
+                isClue ? `ตัวเลขโจทย์ ${val}` : val ? `กรอกเลข ${val}` : 'ช่องว่าง'
+              }`
+            );
+
+            // Dynamic sub-grid borders for 6x6 (2x3) or 9x9 (3x3)
+            if (c === size - 1) {
+              cell.classList.add('last-col');
+            } else if ((c + 1) % boxCols === 0) {
+              cell.classList.add('box-right');
+            }
+
+            if (r === size - 1) {
+              cell.classList.add('last-row');
+            } else if ((r + 1) % boxRows === 0) {
+              cell.classList.add('box-bottom');
+            }
+
+            if (isClue) {
+              cell.classList.add('clue');
+            }
+
+            if (selectedCell) {
+              const isSelected = selectedCell.row === r && selectedCell.col === c;
+              const sameRow = selectedCell.row === r;
+              const sameCol = selectedCell.col === c;
+              const sameBox =
+                Math.floor(selectedCell.row / boxRows) === Math.floor(r / boxRows) &&
+                Math.floor(selectedCell.col / boxCols) === Math.floor(c / boxCols);
+
+              if (isSelected) {
+                cell.classList.add('selected');
+              } else if (sameRow || sameCol || sameBox) {
+                cell.classList.add('related');
+              }
+
+              if (selectedVal && val === selectedVal && !isSelected) {
+                cell.classList.add('same-value');
+              }
+            }
+
+            const feedback = checkFeedbackCells.get(`${r},${c}`);
+            if (feedback === 'invalid') {
+              cell.classList.add('invalid');
+            } else if (feedback === 'ok') {
+              cell.classList.add('verified-ok');
+            }
+
+            cell.textContent = val !== 0 ? val : '';
+
+            cell.addEventListener('click', () => {
+              selectCell(r, c);
+            });
+
+            boardEl.appendChild(cell);
+          }
+        }
+      }
+
+      function selectCell(row, col) {
+        selectedCell = { row, col };
+        saveGameState();
+        renderBoard();
+      }
+
+      function inputNumber(num) {
+        if (!selectedCell) {
+          setStatus('กรุณาคลิกเลือกช่องว่างที่ต้องการเติมก่อนครับ', 'error');
+          return;
+        }
+        const { row, col } = selectedCell;
+        if (initialGrid[row][col] !== 0) {
+          setStatus('ช่องนี้เป็นตัวเลขโจทย์เริ่มต้น ไม่สามารถแก้ไขได้ครับ', 'error');
+          return;
+        }
+
+        checkFeedbackCells.clear();
+        currentGrid[row][col] = num;
+        saveGameState();
+        renderBoard();
+
+        if (num === 0) {
+          setStatus('ลบตัวเลขในช่องที่เลือกแล้ว');
+          return;
+        }
+
+        if (isBoardCompleteAndValid()) {
+          setStatus(`ยอดเยี่ยม! คุณแก้ปริศนา Sudoku ${currentSize}×${currentSize} สำเร็จแล้ว`, 'success');
+          openWinModal();
+        } else {
+          setStatus(`ใส่เลข ${num} ที่แถว ${row + 1} คอลัมน์ ${col + 1} (บันทึกอัตโนมัติ)`);
+        }
+      }
+
+      function isBoardCompleteAndValid() {
+        const config = MODES[currentSize];
+        const { size } = config;
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const val = currentGrid[r][c];
+            if (val === 0 || !isSafe(currentGrid, r, c, val, config)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      }
+
+      function checkBoard() {
+        const config = MODES[currentSize];
+        const { size } = config;
+        checkFeedbackCells.clear();
+        let emptyCount = 0;
+        let errorCount = 0;
+
+        for (let r = 0; r < size; r++) {
+          for (let c = 0; c < size; c++) {
+            const val = currentGrid[r][c];
+            if (val === 0) {
+              emptyCount++;
+              continue;
+            }
+
+            const ruleValid = isSafe(currentGrid, r, c, val, config);
+            const matchesSolution = val === solutionGrid[r][c];
+
+            if (!ruleValid || !matchesSolution) {
+              checkFeedbackCells.set(`${r},${c}`, 'invalid');
+              if (initialGrid[r][c] === 0) {
+                errorCount++;
+              }
+            } else if (initialGrid[r][c] === 0) {
+              checkFeedbackCells.set(`${r},${c}`, 'ok');
+            }
+          }
+        }
+
+        renderBoard();
+
+        if (errorCount > 0) {
+          setStatus(`พบตัวเลขที่ยังไม่ถูกต้อง ${errorCount} ช่อง (ไฮไลต์สีแดง)`, 'error');
+        } else if (emptyCount > 0) {
+          setStatus(`ตัวเลขที่กรอกถูกต้องทั้งหมด! เหลืออีก ${emptyCount} ช่องว่าง`, 'success');
+        } else {
+          setStatus('ยินดีด้วย! คำตอบถูกต้องครบทุกช่อง', 'success');
+          openWinModal();
+        }
+      }
+
+      function resetCurrentPuzzle() {
+        currentGrid = initialGrid.map(row => [...row]);
+        checkFeedbackCells.clear();
+        saveGameState();
+        renderBoard();
+        setStatus('รีเซ็ตช่องที่กรอกกลับเป็นโจทย์เริ่มต้นแล้ว');
+      }
+
+      function startNewGame() {
+        const config = MODES[currentSize];
+        const { solved, puzzle } = createEasyPuzzle(config);
+        solutionGrid = solved;
+        initialGrid = puzzle.map(row => [...row]);
+        currentGrid = puzzle.map(row => [...row]);
+        checkFeedbackCells.clear();
+        selectedCell = findFirstEmptyCell(initialGrid, currentSize);
+
+        closeWinModal();
+        updateModeUI();
+        saveGameState();
+        renderBoard();
+        setStatus(`เริ่มเกมใหม่ (${currentSize}×${currentSize}) เรียบร้อย! เลือกช่องว่างแล้วเติมตัวเลข 1–${currentSize} ได้เลย`);
+      }
+
+      function switchMode(newSize) {
+        if (newSize === currentSize) return;
+
+        // Save current board before switching
+        saveGameState();
+
+        currentSize = newSize;
+        checkFeedbackCells.clear();
+        closeWinModal();
+        updateModeUI();
+
+        // Restore existing game for this size if available, otherwise generate a new one
+        const savedForSize = savedBoardsBySize[currentSize];
+        if (isValidSavedBoard(savedForSize, currentSize)) {
+          solutionGrid = savedForSize.solutionGrid.map(r => [...r]);
+          initialGrid = savedForSize.initialGrid.map(r => [...r]);
+          currentGrid = savedForSize.currentGrid.map(r => [...r]);
+          selectedCell = savedForSize.selectedCell || findFirstEmptyCell(initialGrid, currentSize);
+          saveGameState();
+          renderBoard();
+          setStatus(`สลับเป็นโหมด ${currentSize}×${currentSize} (โหลดเกมที่เล่นค้างไว้เรียบร้อย)`);
+        } else {
+          startNewGame();
+        }
+      }
+
+      function openWinModal() {
+        winModal.classList.add('open');
+      }
+
+      function closeWinModal() {
+        winModal.classList.remove('open');
+      }
+
+      // Keyboard navigation & number entry
+      document.addEventListener('keydown', (e) => {
+        if (winModal.classList.contains('open')) {
+          if (e.key === 'Escape') closeWinModal();
+          return;
+        }
+
+        if (e.key >= '1' && e.key <= String(currentSize)) {
+          e.preventDefault();
+          inputNumber(Number(e.key));
+          return;
+        }
+
+        if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
+          e.preventDefault();
+          inputNumber(0);
+          return;
+        }
+
+        if (!selectedCell) return;
+
+        let { row, col } = selectedCell;
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          row = (row + currentSize - 1) % currentSize;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          row = (row + 1) % currentSize;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          col = (col + currentSize - 1) % currentSize;
+          selectCell(row, col);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          col = (col + 1) % currentSize;
+          selectCell(row, col);
+        }
+      });
+
+      modeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          switchMode(Number(btn.dataset.size));
+        });
+      });
+
+      checkBtn.addEventListener('click', checkBoard);
+      resetBtn.addEventListener('click', resetCurrentPuzzle);
+      newGameBtn.addEventListener('click', startNewGame);
+      closeModalBtn.addEventListener('click', closeWinModal);
+      playAgainBtn.addEventListener('click', startNewGame);
+      winModal.addEventListener('click', (e) => {
+        if (e.target === winModal) closeWinModal();
+      });
+
+      // Initialize: restore saved game if present, otherwise start fresh
+      if (loadGameStateFromStorage()) {
+        updateModeUI();
+        renderBoard();
+        setStatus(`โหลดเกม Sudoku ${currentSize}×${currentSize} ที่เล่นค้างไว้เรียบร้อยแล้ว`);
+      } else {
+        startNewGame();
+      }
+    })();
+  </script>
+</body>
+</html>
